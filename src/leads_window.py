@@ -3,12 +3,22 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushBut
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeyEvent
 import pymysql
+import datetime
 
 class CustomTextEdit(QTextEdit):
-    def __init__(self, parent, key):
+    def __init__(self, parent, key, initial_value):
         super().__init__(parent)
         self.parent = parent
         self.key = key
+        self.initial_value = initial_value
+        self.setPlainText(str(initial_value))
+
+    def focusOutEvent(self, event):
+        current_value = self.toPlainText()
+        if current_value != str(self.initial_value):
+            self.parent.update_field(self.key, current_value)
+        super().focusOutEvent(event)
+
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Tab:
@@ -18,9 +28,7 @@ class CustomTextEdit(QTextEdit):
         else:
             super().keyPressEvent(event)
 
-    def focusOutEvent(self, event):
-        self.parent.update_field(self.key, self.toPlainText())
-        super().focusOutEvent(event)
+ 
 
 from database import get_table_structure
 
@@ -123,8 +131,7 @@ class LeadsWindow(QDialog):
         col = 0
         for key, value in lead.items():
             label = QLabel(f"{key}:")
-            text_edit = CustomTextEdit(self, key)
-            text_edit.setPlainText(str(value))
+            text_edit = CustomTextEdit(self, key, value)
             text_edit.setFixedHeight(30)
             text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             
@@ -163,10 +170,21 @@ class LeadsWindow(QDialog):
             self.display_lead()
 
     def update_field(self, key, new_value):
+        if key == 'attribution_date':
+            try:
+                # Attempt to parse the date
+                datetime.datetime.strptime(new_value, '%Y-%m-%d')
+            except ValueError:
+                print(f"Invalid date format for {key}. Expected format: YYYY-MM-DD")
+                return
+
         if self.leads[self.current_index][key] != new_value:
             self.leads[self.current_index][key] = new_value
             print(f"Updated field '{key}' to '{new_value}'")
             self.save_lead()
+        else:
+            print(f"Field '{key}' not changed, skipping save")
+
 
     def save_lead(self):
         lead = self.leads[self.current_index]
