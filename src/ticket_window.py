@@ -1,8 +1,8 @@
+import pymysql
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                              QTextEdit, QScrollArea, QWidget, QGridLayout, QDesktopWidget)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeyEvent
-import pymysql
 import datetime
 
 class CustomTextEdit(QTextEdit):
@@ -27,28 +27,28 @@ class CustomTextEdit(QTextEdit):
             self.parent.update_field(self.key, current_value)
         super().focusOutEvent(event)
 
-class LeadsWindow(QDialog):
+class TicketWindow(QDialog):
     def __init__(self, db_config):
         super().__init__()
         self.db_config = db_config
-        self.leads = self.fetch_leads()
+        self.tickets = self.fetch_tickets()
         self.table_structure = self.get_table_structure()
         self.inactive_fields = self.get_inactive_fields()
         self.current_index = 0
         self.initUI()
         self.moveToFirstScreen()
 
-    def fetch_leads(self):
+    def fetch_tickets(self):
         try:
             connection = pymysql.connect(**self.db_config, charset='utf8mb4',
                                          cursorclass=pymysql.cursors.DictCursor)
             with connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM leads")
-                leads = cursor.fetchall()
+                cursor.execute("SELECT * FROM ost_user_email")
+                tickets = cursor.fetchall()
             connection.close()
-            return leads
+            return tickets
         except Exception as e:
-            print(f"Error fetching leads: {str(e)}")
+            print(f"Error fetching tickets: {str(e)}")
             return []
 
     def get_table_structure(self):
@@ -56,7 +56,7 @@ class LeadsWindow(QDialog):
             connection = pymysql.connect(**self.db_config, charset='utf8mb4',
                                          cursorclass=pymysql.cursors.DictCursor)
             with connection.cursor() as cursor:
-                cursor.execute("DESCRIBE leads")
+                cursor.execute("DESCRIBE ost_user_email")
                 columns = cursor.fetchall()
             connection.close()
             return columns
@@ -73,12 +73,12 @@ class LeadsWindow(QDialog):
         return inactive
 
     def initUI(self):
-        self.setWindowTitle('Leads')
+        self.setWindowTitle('Tickets')
         self.setGeometry(200, 200, 800, 600)
 
         layout = QVBoxLayout()
 
-        self.total_label = QLabel(f"Total records: {len(self.leads)}")
+        self.total_label = QLabel(f"Total records: {len(self.tickets)}")
         layout.addWidget(self.total_label)
 
         scroll_area = QScrollArea()
@@ -91,25 +91,25 @@ class LeadsWindow(QDialog):
 
         nav_layout = QHBoxLayout()
         self.prev_button = QPushButton('Previous')
-        self.prev_button.clicked.connect(self.previous_lead)
+        self.prev_button.clicked.connect(self.previous_ticket)
         self.next_button = QPushButton('Next')
-        self.next_button.clicked.connect(self.next_lead)
+        self.next_button.clicked.connect(self.next_ticket)
         nav_layout.addWidget(self.prev_button)
         nav_layout.addWidget(self.next_button)
         layout.addLayout(nav_layout)
 
         self.setLayout(layout)
 
-        self.display_lead()
+        self.display_ticket()
 
-    def display_lead(self):
+    def display_ticket(self):
         for i in reversed(range(self.grid_layout.count())): 
             self.grid_layout.itemAt(i).widget().setParent(None)
 
-        lead = self.leads[self.current_index]
+        ticket = self.tickets[self.current_index]
         row = 0
         col = 0
-        for key, value in lead.items():
+        for key, value in ticket.items():
             label = QLabel(f"{key}:")
             text_edit = CustomTextEdit(self, key, value)
             text_edit.setFixedHeight(30)
@@ -136,17 +136,17 @@ class LeadsWindow(QDialog):
 
     def update_nav_buttons(self):
         self.prev_button.setEnabled(self.current_index > 0)
-        self.next_button.setEnabled(self.current_index < len(self.leads) - 1)
+        self.next_button.setEnabled(self.current_index < len(self.tickets) - 1)
 
-    def previous_lead(self):
+    def previous_ticket(self):
         if self.current_index > 0:
             self.current_index -= 1
-            self.display_lead()
+            self.display_ticket()
 
-    def next_lead(self):
-        if self.current_index < len(self.leads) - 1:
+    def next_ticket(self):
+        if self.current_index < len(self.tickets) - 1:
             self.current_index += 1
-            self.display_lead()
+            self.display_ticket()
 
     def update_field(self, key, new_value):
         if key == 'attribution_date':
@@ -159,29 +159,29 @@ class LeadsWindow(QDialog):
                     print(f"Invalid date format for {key}. Expected format: YYYY-MM-DD")
                     return
 
-        if self.leads[self.current_index][key] != new_value:
-            self.leads[self.current_index][key] = new_value
+        if self.tickets[self.current_index][key] != new_value:
+            self.tickets[self.current_index][key] = new_value
             print(f"Updated field '{key}' to '{new_value}'")
-            self.save_lead()
+            self.save_ticket()
         else:
             print(f"Field '{key}' not changed, skipping save")
 
-    def save_lead(self):
-        lead = self.leads[self.current_index]
+    def save_ticket(self):
+        ticket = self.tickets[self.current_index]
         try:
             connection = pymysql.connect(**self.db_config, charset='utf8mb4',
                                          cursorclass=pymysql.cursors.DictCursor)
             with connection.cursor() as cursor:
-                placeholders = ', '.join(['%s = %%s' % key for key in lead.keys()])
-                query = f"UPDATE leads SET {placeholders} WHERE id = %s"
+                placeholders = ', '.join(['%s = %%s' % key for key in ticket.keys()])
+                query = f"UPDATE ost_user_email SET {placeholders} WHERE id = %s"
                 print(f"Executing query: {query}")
-                print(f"With values: {list(lead.values()) + [lead['id']]}")
-                cursor.execute(query, list(lead.values()) + [lead['id']])
+                print(f"With values: {list(ticket.values()) + [ticket['id']]}")
+                cursor.execute(query, list(ticket.values()) + [ticket['id']])
             connection.commit()
             connection.close()
-            print(f"Lead {lead['id']} saved successfully")
+            print(f"Ticket {ticket['id']} saved successfully")
         except Exception as e:
-            print(f"Error saving lead: {str(e)}")
+            print(f"Error saving ticket: {str(e)}")
 
     def moveToFirstScreen(self):
         desktop = QDesktopWidget()
